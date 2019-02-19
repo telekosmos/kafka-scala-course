@@ -6,6 +6,7 @@ import java.util._
 
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
+import org.slf4j.{Logger, LoggerFactory}
 
 object Main extends App {
   private def dateStr(d: Date): String = new SimpleDateFormat("YYYY/MM/dd HH:mm:ss").format(d)
@@ -14,8 +15,9 @@ object Main extends App {
 
   override def main(args: Array[String]) = {
     var latch: CountDownLatch = new CountDownLatch(1)
-    val consumerThread: ConsumerThread = runConsumer(latch)
-
+    val logger: Logger = LoggerFactory.getLogger(classOf[ConsumerThread])
+    val consumerThread: ConsumerThread = runConsumer(logger, latch)
+    // runProducer(20, latch)
     sys.addShutdownHook({
       println("@@@ Entering shutdownhook")
       // consumerThread.interrupt()
@@ -25,7 +27,7 @@ object Main extends App {
         latch.await()
       }
       catch {
-        case i:InterruptedException => println("@@@ App was interrupted [shutdownhook acting]")
+        case i:InterruptedException => logger.info("@@@ App was interrupted [shutdownhook acting]")
       }
       finally {
         println("@@@ FINALLY")
@@ -33,7 +35,7 @@ object Main extends App {
     })
 
     try {
-      System.out.println("@@@ Awaiting for latch")
+      logger.info("@@@ Awaiting for latch")
       latch.await()
     } catch {
       case e:InterruptedException => println(s"Application got interrupted: $e")
@@ -42,20 +44,23 @@ object Main extends App {
     }
   }
 
-  def runProducer(n:Int): Unit = {
+  def runProducer(n:Int, latch: CountDownLatch): Unit = {
     val producer = new ProducerDemo
     val deltaInMillis:Int = 2500;
     val tsInMillis = Calendar.getInstance().getTimeInMillis
 
     def makeTime(i:Int): Long = tsInMillis+(i*1000)+deltaInMillis
     def makeTimeStr(i:Int): String = new SimpleDateFormat("HH:mm:ss").format(new Date(makeTime(i)))
-    def makeMsg(i:Int): String = s"""{"value": "Message $i", "ts": "${makeTime(i)}", "timeString": "${makeTimeStr(i)}"""
-    for (i <- 1 to n)
+    def makeMsg(i:Int): String = s"""{"value": "Message $i", "ts": "${makeTime(i)}", "timeString": "${makeTimeStr(i)}"}"""
+    for (i <- 1 to n) {
       producer.justSend(makeMsg(i))
+      println(makeMsg(i))
+    }
     producer.justClose()
+    latch.countDown()
   }
 
-  private def runConsumer(latch: CountDownLatch): ConsumerThread = {
+  private def runConsumer(logger: Logger, latch: CountDownLatch): ConsumerThread = {
     val GROUP_ID = classOf[ConsumerThread].getSimpleName // +"_"+timeStr
     val BOOTSTRAP_SERVERS = "localhost:9092"
 
@@ -73,7 +78,7 @@ object Main extends App {
       def run = f()
     }, n)
 
-    val runnable: Runnable = new ConsumerThread(props, latch)
+    val runnable: Runnable = new ConsumerThread(props, logger, latch)
     val consumer: Thread = new Thread(runnable)
     consumer.start() // thread
 /*

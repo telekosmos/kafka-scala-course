@@ -6,13 +6,13 @@ import java.util.concurrent.CountDownLatch
 
 import org.apache.kafka.clients.consumer.{ConsumerRecords, KafkaConsumer}
 import org.apache.kafka.common.errors.WakeupException
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
-class ConsumerThread(props: Properties, latch: CountDownLatch) extends Runnable {
+class ConsumerThread(props: Properties, logger: Logger, latch: CountDownLatch) extends Runnable {
   val TOPIC = "scala-topic"
 
   private var running = true
-  private val logger = LoggerFactory.getLogger(classOf[ConsumerThread])
+  // private val logger = LoggerFactory.getLogger(classOf[ConsumerThread])
   private val consumer: KafkaConsumer[String, String] = new KafkaConsumer[String, String](props)
 
   println(s"Constructing ${classOf[ConsumerThread]}")
@@ -26,7 +26,7 @@ class ConsumerThread(props: Properties, latch: CountDownLatch) extends Runnable 
       while (running) { // !Thread.currentThread.isInterrupted) {
         logger.info(s"-----------------------------> $running")
         val records: ConsumerRecords[String, String] = consumer.poll(Duration.ofMillis(5000))
-        logger.info(s"Read ${records.count()} messages")
+        logger.info(s"***==-=> Read ${records.count()} messages")
         records.forEach(r => logger.info("key: " + r.key + ", val: " + r.value + ", part: " + r.partition + ", offset: " + r.offset))
         logger.info("xxxxxxxxxxxxxxx*xxxxxxxxxxxxxxx")
       }

@@ -21,6 +21,7 @@ class ProducerDemo {
   val producer: KafkaProducer[String, String] = new KafkaProducer[String, String](props)
 
   def justSend(msg: String): Unit = {
+    val str = """[{"payload":1,"myFieldB":"g"},{"myFieldA":2,"myFieldB":"k"}]"""
     val record: ProducerRecord[String, String] = new ProducerRecord[String, String](TOPIC, msg)
 
     producer.send(record, new Callback {
