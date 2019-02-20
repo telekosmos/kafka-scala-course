@@ -23,7 +23,9 @@ object Main extends App {
       // consumerThread.interrupt()
       // runnable.asInstanceOf[ConsumerThread].shutdown()
       consumerThread.shutdown()
+      /*
       try {
+        println("### Awaiting for a latch...")
         latch.await()
       }
       catch {
@@ -32,15 +34,16 @@ object Main extends App {
       finally {
         println("@@@ FINALLY")
       }
+      */
     })
 
     try {
       logger.info("@@@ Awaiting for latch")
       latch.await()
     } catch {
-      case e:InterruptedException => println(s"Application got interrupted: $e")
+      case e:InterruptedException => logger.info(s"Application got interrupted: $e")
     } finally {
-      println("Application is closing")
+      logger.info("Application is closing")
     }
   }
 

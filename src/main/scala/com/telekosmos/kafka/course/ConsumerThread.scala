@@ -33,9 +33,9 @@ class ConsumerThread(props: Properties, logger: Logger, latch: CountDownLatch) e
     }
     catch {
       case wex: WakeupException => {
-        logger.info("Received shutdown signal")
-        Thread.currentThread.interrupt()
-        throw wex
+        logger.info("Received wakeup signal to shutdown")
+        // Thread.currentThread.interrupt()
+        // throw wex
       }
       case x: Throwable => {
         logger.info(s"Unknown exception: ${x.getMessage}")
@@ -46,6 +46,7 @@ class ConsumerThread(props: Properties, logger: Logger, latch: CountDownLatch) e
       logger.info("@@@ App (consumer) is closing...")
       running = !running
       consumer.close()
+      logger.info("@@@ Consumer closed")
     }
   }
 
