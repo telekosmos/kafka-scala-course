@@ -17,10 +17,9 @@ object Main extends App {
     var latch: CountDownLatch = new CountDownLatch(1)
     val logger: Logger = LoggerFactory.getLogger(classOf[ConsumerThread])
     val consumerThread: ConsumerThread = runConsumer(logger, latch)
-    // runProducer(20, latch)
+    // runProducer(10, 3, latch)
     sys.addShutdownHook({
       println("@@@ Entering shutdownhook")
-      // consumerThread.interrupt()
       // runnable.asInstanceOf[ConsumerThread].shutdown()
       consumerThread.shutdown()
       /*
@@ -47,16 +46,16 @@ object Main extends App {
     }
   }
 
-  def runProducer(n:Int, latch: CountDownLatch): Unit = {
+  def runProducer(n:Int, factor:Int, latch: CountDownLatch): Unit = {
     val producer = new ProducerDemo
-    val deltaInMillis:Int = 2500;
+    val deltaInMillis:Int = 2500
     val tsInMillis = Calendar.getInstance().getTimeInMillis
 
     def makeTime(i:Int): Long = tsInMillis+(i*1000)+deltaInMillis
     def makeTimeStr(i:Int): String = new SimpleDateFormat("HH:mm:ss").format(new Date(makeTime(i)))
-    def makeMsg(i:Int): String = s"""{"value": "Message $i", "ts": "${makeTime(i)}", "timeString": "${makeTimeStr(i)}"}"""
+    def makeMsg(i:Int): String = s"""{"value": "Message ${i*factor+1}", "ts": "${makeTime(i)}", "timeString": "${makeTimeStr(i)}"}"""
     for (i <- 1 to n) {
-      producer.justSend(makeMsg(i))
+      producer.justSend(makeMsg(i+factor))
       println(makeMsg(i))
     }
     producer.justClose()
