@@ -29,7 +29,9 @@ object Main extends App {
     // Start consumer threads * numConsumers
     // val consumerThread: ConsumerThread = runConsumer(logger, latch)
     val consumerThreads: List[ConsumerThread] = List.fill(numConsumers)(runConsumer(logger, latch))
+    logger.info(s"${consumerThreads.size} consumers started")
     // Start producers * numProducers
+    logger.info(s"Starting $numProducers producers")
     for(i <- 1 to numProducers) runProducer(i*10, 3, latch)
 
     // runProducer(10, 3, latch)
@@ -37,6 +39,7 @@ object Main extends App {
       println("@@@ Entering shutdownhook")
       // runnable.asInstanceOf[ConsumerThread].shutdown()
       // consumerThread.shutdown()
+      logger.info(s"Shuutting down ${consumerThreads.size} consumers")
       consumerThreads.foreach(c => c.shutdown())
     })
 
