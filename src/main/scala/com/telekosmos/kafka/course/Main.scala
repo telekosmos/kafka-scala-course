@@ -4,36 +4,40 @@ import java.text.SimpleDateFormat
 import java.util.concurrent.CountDownLatch
 import java.util._
 
+import com.telekosmos.kafka.course.util.Utils
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.slf4j.{Logger, LoggerFactory}
+
+import scala.collection.immutable.List
 
 object Main extends App {
   private def dateStr(d: Date): String = new SimpleDateFormat("YYYY/MM/dd HH:mm:ss").format(d)
   // (new ProducerDemo).justSend(s"""{"value": "Yet another message", "ts": "$dateStr"}""")
   private def timeStr(d: Date): String = new SimpleDateFormat("HH:mm:ss").format(d)
 
+  private def logger: Logger = LoggerFactory.getLogger(classOf[ConsumerThread])
+
   override def main(args: Array[String]) = {
-    var latch: CountDownLatch = new CountDownLatch(1)
-    val logger: Logger = LoggerFactory.getLogger(classOf[ConsumerThread])
-    val consumerThread: ConsumerThread = runConsumer(logger, latch)
+    // val logger: Logger = LoggerFactory.getLogger(classOf[ConsumerThread])
+    val numConsumers = Utils.getNumOfConsumers(args) getOrElse 0
+    val numProducers = Utils.getNumOfProducers(args) getOrElse 0
+    logger.info(s"CLI args: consumers $numConsumers, producers $numProducers")
+
+    val latch: CountDownLatch = new CountDownLatch(numConsumers+numProducers)
+
+    // Start consumer threads * numConsumers
+    // val consumerThread: ConsumerThread = runConsumer(logger, latch)
+    val consumerThreads: List[ConsumerThread] = List.fill(numConsumers)(runConsumer(logger, latch))
+    // Start producers * numProducers
+    for(i <- 1 to numProducers) runProducer(i*10, 3, latch)
+
     // runProducer(10, 3, latch)
     sys.addShutdownHook({
       println("@@@ Entering shutdownhook")
       // runnable.asInstanceOf[ConsumerThread].shutdown()
-      consumerThread.shutdown()
-      /*
-      try {
-        println("### Awaiting for a latch...")
-        latch.await()
-      }
-      catch {
-        case i:InterruptedException => logger.info("@@@ App was interrupted [shutdownhook acting]")
-      }
-      finally {
-        println("@@@ FINALLY")
-      }
-      */
+      // consumerThread.shutdown()
+      consumerThreads.foreach(c => c.shutdown())
     })
 
     try {
@@ -44,9 +48,11 @@ object Main extends App {
     } finally {
       logger.info("Application is closing")
     }
+
   }
 
   def runProducer(n:Int, factor:Int, latch: CountDownLatch): Unit = {
+    logger.info("### Running producer...")
     val producer = new ProducerDemo
     val deltaInMillis:Int = 2500
     val tsInMillis = Calendar.getInstance().getTimeInMillis
@@ -63,6 +69,7 @@ object Main extends App {
   }
 
   private def runConsumer(logger: Logger, latch: CountDownLatch): ConsumerThread = {
+    logger.info("### Running consumer thread...")
     val GROUP_ID = classOf[ConsumerThread].getSimpleName // +"_"+timeStr
     val BOOTSTRAP_SERVERS = "localhost:9092"
 
@@ -75,7 +82,6 @@ object Main extends App {
 
     println(s"GroupId config -> ${ConsumerConfig.GROUP_ID_CONFIG}:$GROUP_ID")
 
-    // var latch: CountDownLatch = new CountDownLatch(1)
     def delay(f: () => Unit, n: Long) = new Timer().schedule(new TimerTask() {
       def run = f()
     }, n)
@@ -83,39 +89,7 @@ object Main extends App {
     val runnable: Runnable = new ConsumerThread(props, logger, latch)
     val consumer: Thread = new Thread(runnable)
     consumer.start() // thread
-/*
-    val interruptRunnable = new Interrupt(latch)
-    val interruptThread = new Thread(interruptRunnable)
-    interruptThread.start()
-*/
-    /*sys.addShutdownHook({
-      println("@@@ Entering shutdownhook")
-      interruptThread.interrupt()
-      // runnable.asInstanceOf[ConsumerThread].shutdown()
-      // consumer.close()
-      try {
-        latch.await()
-      }
-      catch {
-        case i:InterruptedException => println("@@@ App was interrupted [shutdownhook acting]")
-      }
-      finally {
-        println("@@@ FINALLY")
-      }
-    })
-    // thread.start()
 
-    try {
-      System.out.println("@@@ Awaiting for latch")
-      latch.await()
-    } catch {
-      case e:InterruptedException => println(s"Application got interrupted: $e")
-    } finally {
-      println("Application is closing")
-    }*/
-
-    println("XXXXX End DEMO")
     runnable.asInstanceOf[ConsumerThread]
   }
-  // KafkaExample.run()
 }

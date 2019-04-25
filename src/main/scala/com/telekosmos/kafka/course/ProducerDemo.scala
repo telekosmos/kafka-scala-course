@@ -31,7 +31,7 @@ class ProducerDemo {
           logger.error("Producer error", ex)
       }
     })
-    producer.flush();
+    producer.flush()
     // producer.close()
   }
 

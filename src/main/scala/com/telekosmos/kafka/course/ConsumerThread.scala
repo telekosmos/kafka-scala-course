@@ -34,6 +34,7 @@ class ConsumerThread(props: Properties, logger: Logger, latch: CountDownLatch) e
     catch {
       case wex: WakeupException => {
         logger.info("Received wakeup signal to shutdown")
+        latch.countDown()
         // Thread.currentThread.interrupt()
         // throw wex
       }
