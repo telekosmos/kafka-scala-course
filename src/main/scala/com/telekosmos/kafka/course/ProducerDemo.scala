@@ -32,7 +32,6 @@ class ProducerDemo {
       }
     })
     producer.flush()
-    // producer.close()
   }
 
   def justClose(): Unit = producer.close()
