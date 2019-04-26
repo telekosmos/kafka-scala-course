@@ -13,4 +13,6 @@ object Utils {
   def getNumOfProducers(args: Array[String]): Option[Int] = tryToInt(getParamValue(args, "-p"))
 
   def getNumOfConsumers(args: Array[String]): Option[Int] = tryToInt(getParamValue(args,"-c"))
+
+  def getReprocessors(args: Array[String]): Option[Int] = tryToInt(getParamValue(args, "-r"))
 }

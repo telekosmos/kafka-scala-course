@@ -13,18 +13,19 @@ import scala.collection.immutable.List
 
 object Main extends App {
   private def dateStr(d: Date): String = new SimpleDateFormat("YYYY/MM/dd HH:mm:ss").format(d)
+
   // (new ProducerDemo).justSend(s"""{"value": "Yet another message", "ts": "$dateStr"}""")
   private def timeStr(d: Date): String = new SimpleDateFormat("HH:mm:ss").format(d)
 
   private def logger: Logger = LoggerFactory.getLogger(classOf[ConsumerThread])
 
   override def main(args: Array[String]) = {
-    // val logger: Logger = LoggerFactory.getLogger(classOf[ConsumerThread])
     val numConsumers = Utils.getNumOfConsumers(args) getOrElse 0
     val numProducers = Utils.getNumOfProducers(args) getOrElse 0
+    val numReprocessors = Utils.getReprocessors(args) getOrElse 0
     logger.info(s"CLI args: consumers $numConsumers, producers $numProducers")
 
-    val latch: CountDownLatch = new CountDownLatch(numConsumers+numProducers)
+    val latch: CountDownLatch = new CountDownLatch(numConsumers + numProducers)
 
     // Start consumer threads * numConsumers
     // val consumerThread: ConsumerThread = runConsumer(logger, latch)
@@ -32,43 +33,55 @@ object Main extends App {
     logger.info(s"${consumerThreads.size} consumers started")
     // Start producers * numProducers
     logger.info(s"Starting $numProducers producers")
-    for(i <- 1 to numProducers) runProducer(i*10, 3, latch)
+    val producers: List[ProducerDemo] = List.range(1, numProducers + 1).map(p => runProducer(p * 10, 3))
 
-    // runProducer(10, 3, latch)
+    logger.info(s"Starting reprocessors")
+    def modN(n: Int)(x: Int) = x % n
+    def modRepros(x:Int) = modN(x)(numReprocessors)
+    val reprocessors: List[Reprocessor] = List
+      .range(1, numReprocessors+1)
+      .map(r => runReprocessor(logger, latch, modRepros(3), 0))
+
     sys.addShutdownHook({
       println("@@@ Entering shutdownhook")
       // runnable.asInstanceOf[ConsumerThread].shutdown()
       // consumerThread.shutdown()
       logger.info(s"Shuutting down ${consumerThreads.size} consumers")
       consumerThreads.foreach(c => c.shutdown())
+      producers.foreach(p => p.justClose())
     })
 
     try {
       logger.info("@@@ Awaiting for latch")
       latch.await()
     } catch {
-      case e:InterruptedException => logger.info(s"Application got interrupted: $e")
+      case e: InterruptedException => logger.info(s"Application got interrupted: $e")
     } finally {
       logger.info("Application is closing")
     }
-
   }
 
-  def runProducer(n:Int, factor:Int, latch: CountDownLatch): Unit = {
+  def runProducer(n: Int, factor: Int): ProducerDemo = {
     logger.info("### Running producer...")
-    val producer = new ProducerDemo
-    val deltaInMillis:Int = 2500
+    val producer = new ProducerDemo(logger)
+    val deltaInMillis: Int = 2500
     val tsInMillis = Calendar.getInstance().getTimeInMillis
 
-    def makeTime(i:Int): Long = tsInMillis+(i*1000)+deltaInMillis
-    def makeTimeStr(i:Int): String = new SimpleDateFormat("HH:mm:ss").format(new Date(makeTime(i)))
-    def makeMsg(i:Int): String = s"""{"value": "Message ${i*factor+1}", "ts": "${makeTime(i)}", "timeString": "${makeTimeStr(i)}"}"""
+    def makeTime(i: Int): Long = tsInMillis + (i * 1000) + deltaInMillis
+
+    def makeTimeStr(i: Int): String = new SimpleDateFormat("HH:mm:ss").format(new Date(makeTime(i)))
+
+    def makeMsg(i: Int): String = s"""{"value": "Message ${i * factor + 1}", "ts": "${makeTime(i)}", "timeString": "${makeTimeStr(i)}"}"""
+
     for (i <- 1 to n) {
-      producer.justSend(makeMsg(i+factor))
+      producer.justSend(makeMsg(i + factor))
       println(makeMsg(i))
     }
+    /*
     producer.justClose()
     latch.countDown()
+    */
+    producer
   }
 
   private def runConsumer(logger: Logger, latch: CountDownLatch): ConsumerThread = {
@@ -94,5 +107,22 @@ object Main extends App {
     consumer.start() // thread
 
     runnable.asInstanceOf[ConsumerThread]
+  }
+
+  private def runReprocessor(logger: Logger, latch: CountDownLatch, partition: Int, offsetNumber: Long): Reprocessor = {
+    val BOOTSTRAP_SERVERS = "localhost:9092"
+
+    val props: Properties = new Properties
+    props.setProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS)
+    props.setProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[StringDeserializer].getName)
+    props.setProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[StringDeserializer].getName)
+    props.setProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+
+    val runnable: Runnable = new Reprocessor(props, logger, latch)
+    val reprocessor = runnable.asInstanceOf[Reprocessor]
+    reprocessor.setPartitionOffset(0, 0)
+
+    new Thread(runnable).start()
+    reprocessor
   }
 }

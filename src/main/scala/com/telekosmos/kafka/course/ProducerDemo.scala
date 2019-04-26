@@ -1,18 +1,20 @@
 package com.telekosmos.kafka.course
 
 import java.util.Properties
+import java.util.concurrent.CountDownLatch
 
 import org.apache.kafka.clients.producer._
 import org.apache.kafka.common.serialization.StringSerializer
+import org.slf4j.Logger
 
-class ProducerDemo {
+class ProducerDemo(logger: Logger) {
 
   val TOPIC = "scala-topic"
 
   import org.slf4j.Logger
   import org.slf4j.LoggerFactory
 
-  val logger: Logger = LoggerFactory.getLogger(classOf[Nothing])
+  // val logger: Logger = LoggerFactory.getLogger(classOf[Nothing])
   val props: Properties = new Properties()
   props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092")
   props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[StringSerializer].getName)
@@ -35,5 +37,5 @@ class ProducerDemo {
     // producer.close()
   }
 
-  def justClose(): Unit = producer.close()
+  def justClose(): Unit =  producer.close()
 }
