@@ -25,22 +25,20 @@ object Main extends App {
     val numReprocessors = Utils.getReprocessors(args) getOrElse 0
     logger.info(s"CLI args: consumers $numConsumers, producers $numProducers")
 
-    val latch: CountDownLatch = new CountDownLatch(numConsumers + numProducers)
+    val latch: CountDownLatch = new CountDownLatch(numConsumers + numProducers + numReprocessors)
 
-    // Start consumer threads * numConsumers
-    // val consumerThread: ConsumerThread = runConsumer(logger, latch)
+    logger.info(s"Starting ${numConsumers} consumers")
     val consumerThreads: List[ConsumerThread] = List.fill(numConsumers)(runConsumer(logger, latch))
-    logger.info(s"${consumerThreads.size} consumers started")
-    // Start producers * numProducers
+
     logger.info(s"Starting $numProducers producers")
     val producers: List[ProducerDemo] = List.range(1, numProducers + 1).map(p => runProducer(p * 10, 3))
 
-    logger.info(s"Starting reprocessors")
-    def modN(n: Int)(x: Int) = x % n
-    def modRepros(x:Int) = modN(x)(numReprocessors)
+    logger.info(s"Starting $numReprocessors reprocessors")
+    def modN(n: Int)(x: Int) = n % x
+    def partitionNum(x:Int) = modN(x)(3)
     val reprocessors: List[Reprocessor] = List
       .range(1, numReprocessors+1)
-      .map(r => runReprocessor(logger, latch, modRepros(3), 0))
+      .map(r => runReprocessor(logger, latch, partitionNum(r), 1))
 
     sys.addShutdownHook({
       println("@@@ Entering shutdownhook")
@@ -49,6 +47,7 @@ object Main extends App {
       logger.info(s"Shuutting down ${consumerThreads.size} consumers")
       consumerThreads.foreach(c => c.shutdown())
       producers.foreach(p => p.justClose())
+      reprocessors.foreach(r => r.shutdown())
     })
 
     try {
@@ -120,7 +119,8 @@ object Main extends App {
 
     val runnable: Runnable = new Reprocessor(props, logger, latch)
     val reprocessor = runnable.asInstanceOf[Reprocessor]
-    reprocessor.setPartitionOffset(0, 0)
+    logger.info(s"Assign to partition $partition, with offset $offsetNumber")
+    reprocessor.setPartitionOffset(partition, offsetNumber)
 
     new Thread(runnable).start()
     reprocessor
